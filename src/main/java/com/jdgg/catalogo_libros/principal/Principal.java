@@ -66,15 +66,16 @@ public class Principal {
     private void procesarOpcionMenu(){
         //Selecciona una opción entre 1 y 5
         switch (eleccionUsuario){
+            //Base de datos y API
             case 1 -> buscarLibroPorTitulo();
-            //Secreto. Ideado de forma alternativa para guardar varios libros de un mismo autor
+            //Secreto. Ideado de forma alternativa para guardar varios libros de un mismo autor. API
             case 1221 -> guardarMultiplesLibros1SoloAutor();
             case 2 -> verLibrosRegistrados();
             case 3 -> verAutoresRegistrados();
             case 4 -> verAutoresVivosPorAno();
             case 5 -> listarLibrosPorIdioma();
             case 6 -> estadisticasDeLibros();
-            //Con llamado a API
+            //API
             case 7 -> top10Libros();
             case 8 -> buscarPorAutor();
             case 0 -> System.out.println("saliendo del programa...");
@@ -82,56 +83,80 @@ public class Principal {
         }
     }
 
-    private void buscarLibroPorTitulo() {
-        System.out.println("Ingrese el titulo del libro que desea buscar:");
-        String tituloBuscar = input.nextLine();
-        while(tituloBuscar.isBlank()){
-            tituloBuscar = input.nextLine();
-        }
-        //Revisamos si el libro existe en nuestra base de datos.
-        Optional<Libros> libroExiste = libroRepositorio.findByTituloContainingIgnoreCase(tituloBuscar);
-
-        //Si existe en la base de datos lo mostramos en pantalla, caso contrario se solicita a la API
-        if (libroExiste.isPresent()){
-            System.out.println(libroExiste.get());
-        }else {
-            var datos = llamarAPI(tituloBuscar);
-            //En caso de que el libro exista y se encuentre en la api se obtienen los resultados, caso contrario se hace saber.
-            if(!datos.resultados().isEmpty()){
-                Libros libro = crearLibrosYAutores(datos);
-
-                //Guardamos en la base de datos, gracias a cascade se guardan las 2 entidades.
-                libroRepositorio.save(libro);
-                System.out.println(libro);
-            }else {
-                System.out.println("\nLibro no encontrado\n");
-            }
-        }
-    }
+    //MÉTODOS DE SERVICIO//
 
     //Petición a API y convertir json a clase GeneralDatos.
     private GeneralDatos llamarAPI(String tituloBuscar){
         System.out.println("buscando en la web...");
         var json = consumoAPI.obtenerDatos(baseURL + "?search=" + tituloBuscar.replace(" ", "+"));
-        return convierteDatos.obtenerDatos(json, GeneralDatos.class);
-    }
-
-    private Libros crearLibrosYAutores(GeneralDatos generalDatos){
-        //Extraemos el primer resultado de la conversión, ya que es una lista lo contenido en datos, solo queremos el primer resultado de la api.
-        LibrosDatos librosDatos = generalDatos.resultados().get(0);
-        Libros libro = new Libros(librosDatos.titulo(),librosDatos.idiomas(),librosDatos.descargas());
-
-        //Desarrollamos autores
-        List<Autores> autores = new ArrayList<>();
-        //Guardamos cada autor en una lista de autores
-        for (int i = 0; i < librosDatos.autores().size(); i++) {
-            autores.add(new Autores(librosDatos.autores().get(i).autor(), librosDatos.autores().get(i).fechaNacimiento(), librosDatos.autores().get(i).fechaFallecimiento()));
+        if (json != null){
+            return convierteDatos.obtenerDatos(json, GeneralDatos.class);
+        }else {
+            return null;
         }
-        //Realizamos la relación bidireccional
-        libro.addAutorList(autores);
-        return libro;
     }
 
+    //Crea la entidad libro, para cada libro se le agrega una lista de autores.
+    private List<Libros> crearLibrosYAutores(GeneralDatos generalDatos, int limite){
+        return generalDatos.resultados().stream()
+                //Limita el número de resultados
+                .limit(limite)
+                .map(libro -> {
+                    //Crea lista de autores para cada libro
+                    List<Autores> autoresLibro = libro.autores().stream()
+                            .map(autor -> new Autores(
+                                    autor.autor(),
+                                    autor.fechaNacimiento(),
+                                    autor.fechaFallecimiento()
+                            ))
+                            .toList();
+                    //Crea cada libro que pasa por el stream y agrega la relación bidireccional (libros/autores).
+                    Libros libroNuevo = new Libros(libro.titulo(),libro.idiomas(), libro.descargas());
+                    libroNuevo.addAutorList(autoresLibro);
+                    return libroNuevo;
+                })
+                //Agrega libro por libro a la lista de libros
+                .toList();
+    }
+
+    private String readInputStringWithoutBlank(String mensaje){
+        System.out.println(mensaje);
+        String inputText = input.nextLine();
+        while(inputText.isBlank()){
+            inputText = input.nextLine();
+        }
+        return inputText;
+    }
+
+    //MÉTODOS DE BÚSQUEDA DEL MENÚ//
+
+    private void buscarLibroPorTitulo() {
+        String tituloBuscar = readInputStringWithoutBlank("Ingrese el titulo del libro que desea buscar:");
+
+        //Revisamos si el libro existe en nuestra base de datos.
+        Optional<Libros> libroExiste = libroRepositorio.findByTituloContainingIgnoreCase(tituloBuscar);
+
+        //Si existe en la base de datos lo mostramos en pantalla, caso contrario se solicita a la API
+        if (libroExiste.isPresent()){
+            System.out.println("Buscando en la base de datos...");
+            System.out.println(libroExiste.get());
+        }else {
+            var datos = llamarAPI(tituloBuscar);
+
+            //En caso de que el libro exista y se encuentre en la api se obtienen los resultados, caso contrario se hace saber.
+            if(datos != null){
+                System.out.println("El libro no se encontró en la base de datos, buscando en la web...");
+
+                //Creamos las entidades del libro y sus autores, extraemos solo el primer resultado.
+                List<Libros> libro = crearLibrosYAutores(datos, 1);
+                //Guardamos en la base de datos, gracias a cascade se guardan las 2 entidades.
+                libroRepositorio.save(libro.get(0));
+                System.out.println(libro.get(0));
+            }else {
+                System.out.println("\nLibro no encontrado\n");
+            }
+        }
+    }
 
     private void verLibrosRegistrados() {
         libroRepositorio.findAll().forEach(System.out::println);
@@ -169,6 +194,8 @@ public class Principal {
         }
     }
 
+    //Arreglar idiomas como una lista de idiomas
+    //Probar con un libro que tenga varios idiomas registrados
     private void listarLibrosPorIdioma() {
         System.out.println("Ingrese el idioma para buscar los libros");
         System.out.println("Idiomas disponibles:");
@@ -201,25 +228,12 @@ public class Principal {
         System.out.println("Buscando en la web...");
         var json = consumoAPI.obtenerDatos(baseURL);
         GeneralDatos generalDatos = convierteDatos.obtenerDatos(json, GeneralDatos.class);
-        List<Autores> autores = new ArrayList<>();
-        List<Libros> libros = generalDatos.resultados().stream()
-                .map(libro -> {
-                    autores.add(new Autores(libro.autores().get(0).autor(),libro.autores().get(0).fechaNacimiento(),libro.autores().get(0).fechaFallecimiento()));
-                    return new Libros(libro.titulo(),libro.idiomas(), libro.descargas());
-                })
-                .limit(5)
-                .toList();
-        for (int i = 0; i < libros.size(); i++) {
-            libros.get(i).setAutores(List.of(autores.get(i)));
-        }
+        List<Libros> libros = crearLibrosYAutores(generalDatos, 10);
         libros.forEach(System.out::println);
-        //Arreglar idiomas como una lista de idiomas
-        //Probar con un libro que tenga varios idiomas registrados
     }
 
     private void buscarPorAutor() {
-        System.out.println("Ingrese el nombre del autor:");
-        String nombreBuscar = input.nextLine();
+        String nombreBuscar = readInputStringWithoutBlank("Ingrese el nombre del autor:");
         Optional<Autores> autor = autoresRepositorio.findByNombreContainingIgnoreCase(nombreBuscar);
         if (autor.isPresent()){
             Autores autorBuscado = autor.get();
@@ -255,11 +269,7 @@ public class Principal {
             if (bucleBusqueda == 0){
                 break;
             }
-            System.out.println("Ingrese el titulo del libro que desea buscar:");
-            String tituloBuscar = input.nextLine();
-            while(tituloBuscar.isBlank()) {
-                tituloBuscar = input.nextLine();
-            }
+            String tituloBuscar = readInputStringWithoutBlank("Ingrese el titulo del libro que desea buscar:");
             Optional<Libros> libroExiste = libroRepositorio.findByTituloContainingIgnoreCase(tituloBuscar);
             if (libroExiste.isPresent()){
                 System.out.println(libroExiste.get());
