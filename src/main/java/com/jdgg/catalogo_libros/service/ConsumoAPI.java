@@ -12,7 +12,7 @@ public class ConsumoAPI {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
                 .build();
-        System.out.println(request);
+//        System.out.println(request);
         HttpResponse<String> response = null;
         try {
             response = client
@@ -23,7 +23,7 @@ public class ConsumoAPI {
             throw new RuntimeException(e);
         }
         String json = response.body();
-        System.out.println(response);
+//        System.out.println(response);
         return json;
     }
 }

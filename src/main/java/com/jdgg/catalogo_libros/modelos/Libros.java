@@ -80,6 +80,11 @@ public class Libros {
         autor.getLibros().add(this);
     }
 
+    public void addAutorList(List<Autores> autores){
+      this.autores = autores;
+      autores.forEach(a->a.getLibros().add(this));
+    }
+
     private String autoresNombres (){
         return autores.stream().map(Autores::getAutor).collect(Collectors.joining(", "));
     }

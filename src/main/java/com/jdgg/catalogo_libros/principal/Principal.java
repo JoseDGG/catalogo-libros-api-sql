@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class Principal {
     private Scanner input = new Scanner(System.in);
@@ -54,6 +55,9 @@ public class Principal {
                 3.) - Ver autores registrados
                 4.) - Ver autores vivos en un determinado año
                 5.) - listar libros por idioma
+                6.) - Estadísticas sobre descargas de libros
+                7.) - Top 10 libros más famosos
+                8.) - Buscar por autor
                 0.) - salir de la aplicación
                 *********************************************
                 """);
@@ -69,6 +73,10 @@ public class Principal {
             case 3 -> verAutoresRegistrados();
             case 4 -> verAutoresVivosPorAno();
             case 5 -> listarLibrosPorIdioma();
+            case 6 -> estadisticasDeLibros();
+            //Con llamado a API
+            case 7 -> top10Libros();
+            case 8 -> buscarPorAutor();
             case 0 -> System.out.println("saliendo del programa...");
             default -> System.out.println("Por favor escriba una opción del menú -->");
         }
@@ -80,7 +88,6 @@ public class Principal {
         while(tituloBuscar.isBlank()){
             tituloBuscar = input.nextLine();
         }
-
         //Revisamos si el libro existe en nuestra base de datos.
         Optional<Libros> libroExiste = libroRepositorio.findByTituloContainingIgnoreCase(tituloBuscar);
 
@@ -91,17 +98,10 @@ public class Principal {
             var datos = llamarAPI(tituloBuscar);
             //En caso de que el libro exista y se encuentre en la api se obtienen los resultados, caso contrario se hace saber.
             if(!datos.resultados().isEmpty()){
-                //Extraemos el primer resultado de la conversión, ya que es una lista lo contenido en datos, solo queremos el primer resultado de la api.
-                LibrosDatos librosDatos = datos.resultados().get(0);
-                Libros libro = new Libros(librosDatos.titulo(),librosDatos.idiomas(),librosDatos.descargas());
-
-                //Desarrollamos autores
-                Autores autor = new Autores(librosDatos.autores().get(0).autor(), librosDatos.autores().get(0).fechaNacimiento(), librosDatos.autores().get(0).fechaFallecimiento());
-                libro.addAutor(autor);
+                Libros libro = crearLibrosYAutores(datos);
 
                 //Guardamos en la base de datos, gracias a cascade se guardan las 2 entidades.
                 libroRepositorio.save(libro);
-
                 System.out.println(libro);
             }else {
                 System.out.println("\nLibro no encontrado\n");
@@ -115,6 +115,23 @@ public class Principal {
         var json = consumoAPI.obtenerDatos(baseURL + "?search=" + tituloBuscar.replace(" ", "+"));
         return convierteDatos.obtenerDatos(json, GeneralDatos.class);
     }
+
+    private Libros crearLibrosYAutores(GeneralDatos generalDatos){
+        //Extraemos el primer resultado de la conversión, ya que es una lista lo contenido en datos, solo queremos el primer resultado de la api.
+        LibrosDatos librosDatos = generalDatos.resultados().get(0);
+        Libros libro = new Libros(librosDatos.titulo(),librosDatos.idiomas(),librosDatos.descargas());
+
+        //Desarrollamos autores
+        List<Autores> autores = new ArrayList<>();
+        //Guardamos cada autor en una lista de autores
+        for (int i = 0; i < librosDatos.autores().size(); i++) {
+            autores.add(new Autores(librosDatos.autores().get(i).autor(), librosDatos.autores().get(i).fechaNacimiento(), librosDatos.autores().get(i).fechaFallecimiento()));
+        }
+        //Realizamos la relación bidireccional
+        libro.addAutorList(autores);
+        return libro;
+    }
+
 
     private void verLibrosRegistrados() {
         libroRepositorio.findAll().forEach(System.out::println);
@@ -167,6 +184,57 @@ public class Principal {
             List<Libros> libros = libroRepositorio.buscarLibrosPorIdioma(idiomaEnum.toLowerCase());
             System.out.println("Libros encontrados: " + libros.size() + "\n");
             libros.forEach(System.out::println);
+        }
+    }
+
+    private void estadisticasDeLibros() {
+        List<Libros> libros = libroRepositorio.findAll();
+        DoubleSummaryStatistics estadisticas = libros.stream()
+                .filter(libro -> libro.getDescargas() > 0)
+                .collect(Collectors.summarizingDouble(Libros::getDescargas));
+        System.out.println("Se ha descargado un total de " + estadisticas.getMax() + " veces el libro mas descargado");
+        System.out.println("La media de los libros descargados es: " + estadisticas.getAverage() + " descargas");
+        System.out.println("Se han descargado libros un total de: " + estadisticas.getSum() + " veces");
+    }
+
+    private void top10Libros() {
+        System.out.println("Buscando en la web...");
+        var json = consumoAPI.obtenerDatos(baseURL);
+        GeneralDatos generalDatos = convierteDatos.obtenerDatos(json, GeneralDatos.class);
+        List<Autores> autores = new ArrayList<>();
+        List<Libros> libros = generalDatos.resultados().stream()
+                .map(libro -> {
+                    autores.add(new Autores(libro.autores().get(0).autor(),libro.autores().get(0).fechaNacimiento(),libro.autores().get(0).fechaFallecimiento()));
+                    return new Libros(libro.titulo(),libro.idiomas(), libro.descargas());
+                })
+                .limit(5)
+                .toList();
+        for (int i = 0; i < libros.size(); i++) {
+            libros.get(i).setAutores(List.of(autores.get(i)));
+        }
+        libros.forEach(System.out::println);
+        //Arreglar idiomas como una lista de idiomas
+        //Probar con un libro que tenga varios idiomas registrados
+    }
+
+    private void buscarPorAutor() {
+        System.out.println("Ingrese el nombre del autor:");
+        String nombreBuscar = input.nextLine();
+        Optional<Autores> autor = autoresRepositorio.findByNombreContainingIgnoreCase(nombreBuscar);
+        if (autor.isPresent()){
+            Autores autorBuscado = autor.get();
+            System.out.println(autor.get());
+            System.out.println("¿Desea ver los detalles de los libros?");
+            System.out.println("Presione: 1 - SI / cualquier tecla - NO");
+            String mostrarLibros = input.nextLine();
+            if (mostrarLibros == "1"){
+                List<Libros> libros = autorBuscado.getLibros();
+                libros.forEach(System.out::println);
+            }else {
+                System.out.println("\n");
+            }
+        }else {
+            System.out.println("Autor no encontrado");
         }
     }
 
