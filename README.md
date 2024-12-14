@@ -123,19 +123,19 @@ la ejecución del programa donde Twenty years after muestra 2 autores.
 - En la consola se observa como se guardaron 2 autores para un mismo libro (Dumas Alexandre y Maquet Auguste).
 - También se puede observar como los idiomas no son códigos de la API si no texto legible.
 
-<img alt="varios autores" src="main/java/com/jdgg/catalogo_libros/assets/varios_autores.png" width="800">
+<img alt="varios autores" src="src/main/java/com/jdgg/catalogo_libros/assets/varios_autores.png" width="800">
 
 - En esta foto se muestra el método en el que se buscan libros por su titulo dependiendo si se encuentran en el repositorio o no
 - En la consola se observa como se guardaron 2 libros para un mismo autor (Emma y Pride and Prejudice).
 
-<img alt="varios autores" src="main/java/com/jdgg/catalogo_libros/assets/varios_libros.png" width="800">
+<img alt="varios autores" src="src/main/java/com/jdgg/catalogo_libros/assets/varios_libros.png" width="800">
 
 - En esta foto se muestra el método con el que se consigue pasar un `String` de códigos de idiomas guardados en la base de datos a un
 String de idiomas legible para los usuarios sin afectar si el idioma aún no ha sido registrado.
 - Para este caso la API no contiene autor por tanto se decidió dejar como N/A sin afectar las relaciones bidireccionales en la base de datos, aparecerá el libro registrado pero sin un autor al cuál haga referencia
   - Si se desea cambiar este comportamiento se debe mapear `nombre` de autor como `@Nonull` o lo pertinente.
 
-<img alt="varios autores" src="main/java/com/jdgg/catalogo_libros/assets/varios_idiomas.png" width="800">
+<img alt="varios autores" src="src/main/java/com/jdgg/catalogo_libros/assets/varios_idiomas.png" width="800">
 
 
 ### 2. **Clase Principal**
