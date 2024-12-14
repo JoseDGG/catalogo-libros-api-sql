@@ -81,30 +81,36 @@ public class Libros {
     }
 
     public void addAutorList(List<Autores> autores){
-      this.autores = autores;
-      autores.forEach(a->a.getLibros().add(this));
+        this.autores = autores;
+        autores.forEach(a->a.getLibros().add(this));
     }
 
     private String autoresNombres (){
-        return autores.stream().map(Autores::getAutor).collect(Collectors.joining(", "));
+        if (autores == null || autores.isEmpty()) {
+            return "N/A";
+        }else {
+            return autores.stream().map(Autores::getAutor).collect(Collectors.joining(", "));
+        }
     }
 
     private String getIdiomasLegible(String idiomas){
         if (idiomas == null || idiomas.isBlank()) {
-            return "";
+            return "N/A";
         }
+        else {
         List<String> idioma = List.of(idiomas.split(",\\s*"));
         return idioma.stream().map(Idiomas::idiomaLegible).collect(Collectors.joining(", "));
+        }
     }
 
     @Override
     public String toString() {
         return  String.format(
                 "----------Libro-----------%n" +
-                "titulo: %s%n" +
-                "autor: %s%n" +
-                "idiomas: %s%n" +
-                "descargas totales: %s%n" +
-                "--------------------------%n", titulo, autoresNombres(), getIdiomasLegible(idiomas), descargas);
+                        "titulo: %s%n" +
+                        "autor: %s%n" +
+                        "idiomas: %s%n" +
+                        "descargas totales: %s%n" +
+                        "--------------------------%n", titulo, autoresNombres(), getIdiomasLegible(idiomas), descargas);
     }
 }
