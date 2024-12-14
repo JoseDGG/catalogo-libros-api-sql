@@ -193,9 +193,7 @@ public class Principal {
             }
         }
     }
-
-    //Arreglar idiomas como una lista de idiomas
-    //Probar con un libro que tenga varios idiomas registrados
+    
     private void listarLibrosPorIdioma() {
         System.out.println("Ingrese el idioma para buscar los libros");
         System.out.println("Idiomas disponibles:");

@@ -89,6 +89,14 @@ public class Libros {
         return autores.stream().map(Autores::getAutor).collect(Collectors.joining(", "));
     }
 
+    private String getIdiomasLegible(String idiomas){
+        if (idiomas == null || idiomas.isBlank()) {
+            return "";
+        }
+        List<String> idioma = List.of(idiomas.split(",\\s*"));
+        return idioma.stream().map(Idiomas::idiomaLegible).collect(Collectors.joining(", "));
+    }
+
     @Override
     public String toString() {
         return  String.format(
@@ -97,6 +105,6 @@ public class Libros {
                 "autor: %s%n" +
                 "idiomas: %s%n" +
                 "descargas totales: %s%n" +
-                "--------------------------%n", titulo, autoresNombres(), Idiomas.idiomaLegible(idiomas), descargas);
+                "--------------------------%n", titulo, autoresNombres(), getIdiomasLegible(idiomas), descargas);
     }
 }
